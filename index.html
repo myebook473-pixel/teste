@@ -359,8 +359,7 @@
     selectedNodeId: null,
     connectMode: false,
     connectFrom: null,
-    dragging: null,
-    offset: {x:0,y:0}
+    dragging: null
   };
 
   const uid = () => Math.random().toString(16).slice(2,10);
@@ -417,16 +416,21 @@
       el.addEventListener('pointerdown', (e) => {
         // avoid drag when in connect mode? still allow drag
         selectNode(node.id);
-        state.dragging = node.id;
-        const rect = el.getBoundingClientRect();
-        state.offset.x = e.clientX - rect.left;
-        state.offset.y = e.clientY - rect.top;
+        state.dragging = {
+          id: node.id,
+          startX: e.clientX,
+          startY: e.clientY,
+          nodeX: node.x,
+          nodeY: node.y,
+          moved: false
+        };
         el.setPointerCapture(e.pointerId);
       });
 
       el.addEventListener('pointerup', (e) => {
+        const wasDrag = state.dragging && state.dragging.id === node.id && state.dragging.moved;
         // Connect logic: click origin -> destination
-        if(state.connectMode){
+        if(state.connectMode && !wasDrag){
           const id = node.id;
           if(!state.connectFrom){
             state.connectFrom = id;
@@ -622,13 +626,20 @@
   // Drag move
   window.addEventListener('pointermove', (e) => {
     if(!state.dragging) return;
-    const id = state.dragging;
+    const id = state.dragging.id;
     const node = state.nodes.get(id);
     if(!node) return;
 
     const wrap = document.getElementById('canvasWrap').getBoundingClientRect();
-    node.x = Math.max(10, Math.min(e.clientX - wrap.left - state.offset.x, wrap.width - 240));
-    node.y = Math.max(10, Math.min(e.clientY - wrap.top  - state.offset.y, wrap.height - 140));
+    const dx = e.clientX - state.dragging.startX;
+    const dy = e.clientY - state.dragging.startY;
+
+    if(Math.abs(dx) > 2 || Math.abs(dy) > 2){
+      state.dragging.moved = true;
+    }
+
+    node.x = Math.max(10, Math.min(state.dragging.nodeX + dx, wrap.width - 240));
+    node.y = Math.max(10, Math.min(state.dragging.nodeY + dy, wrap.height - 140));
     render();
   });
   window.addEventListener('pointerup', () => { state.dragging = null; });
