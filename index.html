@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fluxo de Equipamentos (Protótipo)</title>
+  <style>
+    :root{
+      --bg:#0f1115;
+      --panel:#151924;
+      --card:#1b2130;
+      --line:#ff8a00;
+      --text:#e9eef7;
+      --muted:#9aa7bd;
+      --border:#2a3347;
+      --accent:#ff8a00;
+      --ok:#45d483;
+      --warn:#ffcc66;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 30% 10%, #1a1f2c 0%, var(--bg) 60%);
+      color:var(--text);
+      height:100vh;
+      overflow:hidden;
+    }
+    header{
+      height:56px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:0 14px;
+      background: rgba(10,12,16,.55);
+      border-bottom:1px solid rgba(255,255,255,.06);
+      backdrop-filter: blur(10px);
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px; min-width:260px;
+    }
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--accent); box-shadow:0 0 0 4px rgba(255,138,0,.15)}
+    .title{font-weight:700}
+    .sub{font-size:12px;color:var(--muted)}
+    .toolbar{
+      display:flex; align-items:center; gap:10px; flex:1;
+    }
+    button{
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding:8px 10px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button:hover{background: rgba(255,255,255,.10)}
+    button.primary{
+      background: rgba(255,138,0,.15);
+      border-color: rgba(255,138,0,.35);
+    }
+    button.primary:hover{background: rgba(255,138,0,.22)}
+    button.active{
+      outline:2px solid rgba(255,138,0,.65);
+      background: rgba(255,138,0,.18);
+    }
+    .hint{
+      margin-left:auto;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      white-space:nowrap;
+    }
+    .pill{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.05);
+    }
+
+    #app{
+      display:grid;
+      grid-template-columns: 1fr 320px;
+      height: calc(100vh - 56px);
+    }
+
+    /* Canvas */
+    #canvasWrap{
+      position:relative;
+      overflow:hidden;
+    }
+    #svg{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      pointer-events:none;
+    }
+    #nodesLayer{
+      position:absolute;
+      inset:0;
+    }
+
+    /* Node card */
+    .node{
+      position:absolute;
+      width:220px;
+      border-radius:18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      padding:12px;
+      user-select:none;
+      cursor:grab;
+    }
+    .node:active{cursor:grabbing}
+    .node.selected{
+      outline:2px solid rgba(255,138,0,.65);
+      box-shadow: 0 12px 34px rgba(0,0,0,.45), 0 0 0 6px rgba(255,138,0,.08);
+    }
+
+    .nodeTop{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    }
+    .nodeName{
+      font-weight:800;
+      font-size:14px;
+      line-height:1.2;
+    }
+    .nodeMeta{
+      margin-top:4px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .badge{
+      font-size:11px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      color:var(--text);
+      background: rgba(255,255,255,.05);
+      white-space:nowrap;
+    }
+    .badge.partner{border-color: rgba(255,138,0,.35); background: rgba(255,138,0,.12)}
+    .badge.client{border-color: rgba(69,212,131,.35); background: rgba(69,212,131,.10)}
+    .badge.pool{border-color: rgba(255,204,102,.35); background: rgba(255,204,102,.10)}
+
+    .qty{
+      margin-top:10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.18);
+    }
+    .qty strong{font-size:18px}
+    .qty small{color:var(--muted); font-weight:600}
+
+    .ports{
+      margin-top:10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .port{
+      width:12px; height:12px; border-radius:999px;
+      background: rgba(255,255,255,.30);
+      border:1px solid rgba(255,255,255,.25);
+      position:relative;
+    }
+    .port.out{background: rgba(255,138,0,.65); border-color: rgba(255,138,0,.6)}
+    .port.in{background: rgba(120,170,255,.55); border-color: rgba(120,170,255,.55)}
+    .port::after{
+      content:"";
+      position:absolute;
+      inset:-6px;
+      border-radius:999px;
+    }
+
+    /* Side panel */
+    aside{
+      border-left:1px solid rgba(255,255,255,.06);
+      background: rgba(10,12,16,.35);
+      backdrop-filter: blur(10px);
+      padding:14px;
+      overflow:auto;
+    }
+    .panelCard{
+      background: rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:12px;
+      margin-bottom:12px;
+    }
+    .panelTitle{
+      font-weight:800;
+      margin:0 0 10px 0;
+      font-size:14px;
+    }
+    label{font-size:12px;color:var(--muted);display:block;margin-top:10px;margin-bottom:6px}
+    input, select{
+      width:100%;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
+      color:var(--text);
+      outline:none;
+    }
+    .row{
+      display:flex; gap:10px;
+    }
+    .row > *{flex:1}
+    .danger{
+      background: rgba(255,70,70,.12);
+      border-color: rgba(255,70,70,.35);
+    }
+    .mini{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .edgesList{
+      display:flex; flex-direction:column; gap:8px;
+      margin-top:10px;
+    }
+    .edgeItem{
+      padding:10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.16);
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+    }
+    .edgeItem code{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:11px;
+      color: #cfe0ff;
+      opacity:.95;
+    }
+    .edgeItem button{
+      padding:6px 8px;
+      border-radius:10px;
+      font-size:12px;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <div class="title">Fluxo de Equipamentos</div>
+      <div class="sub">Arraste caixas • Conecte com linhas • Mostre origem e estado atual</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="btnAdd" class="primary">+ Novo bloco</button>
+    <button id="btnConnect">Modo conectar</button>
+    <button id="btnDemo">Carregar demo</button>
+    <button id="btnReset" class="danger">Limpar</button>
+
+    <div class="hint">
+      <span class="pill">Clique para selecionar</span>
+      <span class="pill">No modo conectar: clique origem → destino</span>
+    </div>
+  </div>
+</header>
+
+<div id="app">
+  <div id="canvasWrap">
+    <svg id="svg"></svg>
+    <div id="nodesLayer"></div>
+  </div>
+
+  <aside>
+    <div class="panelCard">
+      <h3 class="panelTitle">Bloco selecionado</h3>
+      <div class="mini" id="noSel">Selecione um bloco para editar.</div>
+
+      <div id="editor" style="display:none">
+        <label>Nome</label>
+        <input id="edName" />
+
+        <div class="row">
+          <div>
+            <label>Tipo</label>
+            <select id="edType">
+              <option value="partner">Parceiro (origem)</option>
+              <option value="client">Cliente</option>
+              <option value="pool">Pool / Depósito</option>
+            </select>
+          </div>
+          <div>
+            <label>Quantidade</label>
+            <input id="edQty" type="number" min="0" />
+          </div>
+        </div>
+
+        <label>Item</label>
+        <input id="edItem" placeholder="ex: Andaime 1,5m" />
+
+        <div class="row" style="margin-top:10px">
+          <button id="btnUpdate" class="primary">Salvar</button>
+          <button id="btnDelete" class="danger">Excluir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panelCard">
+      <h3 class="panelTitle">Linhas do selecionado</h3>
+      <div class="mini">Clique em “Editar” para mudar a quantidade da linha.</div>
+      <div class="edgesList" id="edgesList"></div>
+    </div>
+
+    <div class="panelCard">
+      <h3 class="panelTitle">Como isso vira o seu sistema</h3>
+      <div class="mini">
+        • Cada linha representa um “movimento” (aluguel, realuguel, devolução, divisão).<br/>
+        • O “estado atual” é o somatório das entradas/saídas em cada bloco no dia.<br/>
+        • Você pode filtrar por data e recalcular o grafo (timeline).<br/>
+        • Depois dá pra salvar tudo em JSON/localStorage e gerar relatório tipo planilha.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const svg = document.getElementById('svg');
+  const nodesLayer = document.getElementById('nodesLayer');
+
+  const btnAdd = document.getElementById('btnAdd');
+  const btnConnect = document.getElementById('btnConnect');
+  const btnDemo = document.getElementById('btnDemo');
+  const btnReset = document.getElementById('btnReset');
+
+  const noSel = document.getElementById('noSel');
+  const editor = document.getElementById('editor');
+  const edName = document.getElementById('edName');
+  const edType = document.getElementById('edType');
+  const edQty  = document.getElementById('edQty');
+  const edItem = document.getElementById('edItem');
+  const btnUpdate = document.getElementById('btnUpdate');
+  const btnDelete = document.getElementById('btnDelete');
+  const edgesList = document.getElementById('edgesList');
+
+  const state = {
+    nodes: new Map(),     // id -> node
+    edges: new Map(),     // id -> edge
+    selectedNodeId: null,
+    connectMode: false,
+    connectFrom: null,
+    dragging: null,
+    offset: {x:0,y:0}
+  };
+
+  const uid = () => Math.random().toString(16).slice(2,10);
+
+  function centerOf(node){
+    return { x: node.x + 110, y: node.y + 60 }; // approx center of 220x120 block
+  }
+
+  function portPos(node, which){
+    // "out" right, "in" left
+    const baseY = node.y + 112; // near bottom
+    if(which === 'out') return { x: node.x + 206, y: baseY };
+    return { x: node.x + 14, y: baseY };
+  }
+
+  function render(){
+    // Render nodes
+    nodesLayer.innerHTML = '';
+    for(const node of state.nodes.values()){
+      const el = document.createElement('div');
+      el.className = 'node' + (node.id === state.selectedNodeId ? ' selected' : '');
+      el.style.left = node.x + 'px';
+      el.style.top  = node.y + 'px';
+      el.dataset.id = node.id;
+
+      const badgeClass = node.type === 'partner' ? 'partner' : (node.type === 'client' ? 'client' : 'pool');
+
+      el.innerHTML = `
+        <div class="nodeTop">
+          <div>
+            <div class="nodeName">${escapeHtml(node.name)}</div>
+            <div class="nodeMeta">${escapeHtml(node.item || '—')}</div>
+          </div>
+          <div class="badge ${badgeClass}">${labelType(node.type)}</div>
+        </div>
+
+        <div class="qty">
+          <div>
+            <strong>${node.qty}</strong><br/>
+            <small>unidades</small>
+          </div>
+          <div style="text-align:right">
+            <small style="display:block;color:var(--muted);font-weight:700">ID</small>
+            <small style="font-family:ui-monospace,monospace;color:#cfe0ff">${node.id.slice(0,6)}</small>
+          </div>
+        </div>
+
+        <div class="ports">
+          <div class="port in" title="Entrada"></div>
+          <div class="port out" title="Saída"></div>
+        </div>
+      `;
+
+      el.addEventListener('pointerdown', (e) => {
+        // avoid drag when in connect mode? still allow drag
+        selectNode(node.id);
+        state.dragging = node.id;
+        const rect = el.getBoundingClientRect();
+        state.offset.x = e.clientX - rect.left;
+        state.offset.y = e.clientY - rect.top;
+        el.setPointerCapture(e.pointerId);
+      });
+
+      el.addEventListener('pointerup', (e) => {
+        // Connect logic: click origin -> destination
+        if(state.connectMode){
+          const id = node.id;
+          if(!state.connectFrom){
+            state.connectFrom = id;
+          } else if(state.connectFrom && state.connectFrom !== id){
+            createEdge(state.connectFrom, id, 0);
+            state.connectFrom = null;
+          }
+          render(); // update selection highlight
+        }
+      });
+
+      nodesLayer.appendChild(el);
+    }
+
+    // Render edges in SVG
+    svg.innerHTML = `
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+          <path d="M0,0 L10,3 L0,6 Z" fill="rgba(255,138,0,.9)"></path>
+        </marker>
+      </defs>
+    `;
+
+    for(const edge of state.edges.values()){
+      const from = state.nodes.get(edge.from);
+      const to   = state.nodes.get(edge.to);
+      if(!from || !to) continue;
+
+      const p1 = portPos(from, 'out');
+      const p2 = portPos(to, 'in');
+
+      const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.35);
+      const c1 = { x: p1.x + dx, y: p1.y };
+      const c2 = { x: p2.x - dx, y: p2.y };
+
+      const d = `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'rgba(255,138,0,.85)');
+      path.setAttribute('stroke-width', '3.2');
+      path.setAttribute('marker-end','url(#arrow)');
+      path.setAttribute('stroke-linecap','round');
+      svg.appendChild(path);
+
+      // label
+      const mid = cubicMid(p1, c1, c2, p2);
+      const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+
+      const r = document.createElementNS("http://www.w3.org/2000/svg","rect");
+      r.setAttribute('x', mid.x - 22);
+      r.setAttribute('y', mid.y - 12);
+      r.setAttribute('rx', 10);
+      r.setAttribute('ry', 10);
+      r.setAttribute('width', 44);
+      r.setAttribute('height', 24);
+      r.setAttribute('fill', 'rgba(0,0,0,.45)');
+      r.setAttribute('stroke', 'rgba(255,255,255,.12)');
+
+      const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute('x', mid.x);
+      t.setAttribute('y', mid.y + 4);
+      t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size','12');
+      t.setAttribute('font-family','ui-monospace, Menlo, Consolas, monospace');
+      t.setAttribute('fill','#cfe0ff');
+      t.textContent = String(edge.qty);
+
+      g.appendChild(r);
+      g.appendChild(t);
+      svg.appendChild(g);
+    }
+
+    renderPanel();
+  }
+
+  function cubicMid(p0,p1,p2,p3){
+    // t=0.5 on cubic bezier
+    const t=0.5;
+    const x = Math.pow(1-t,3)*p0.x + 3*Math.pow(1-t,2)*t*p1.x + 3*(1-t)*t*t*p2.x + t*t*t*p3.x;
+    const y = Math.pow(1-t,3)*p0.y + 3*Math.pow(1-t,2)*t*p1.y + 3*(1-t)*t*t*p2.y + t*t*t*p3.y;
+    return {x,y};
+  }
+
+  function labelType(type){
+    if(type==='partner') return 'PARCEIRO';
+    if(type==='client') return 'CLIENTE';
+    return 'POOL';
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  }
+
+  function addNode({name, type, qty, item, x, y}){
+    const id = uid();
+    state.nodes.set(id, { id, name, type, qty: Number(qty||0), item: item||'', x:x??80, y:y??80 });
+    selectNode(id);
+    render();
+  }
+
+  function createEdge(from, to, qty){
+    const id = uid();
+    state.edges.set(id, { id, from, to, qty: Number(qty||0) });
+    render();
+  }
+
+  function selectNode(id){
+    state.selectedNodeId = id;
+    render();
+  }
+
+  function deleteNode(id){
+    state.nodes.delete(id);
+    // remove edges linked
+    for(const [eid, e] of [...state.edges.entries()]){
+      if(e.from===id || e.to===id) state.edges.delete(eid);
+    }
+    state.selectedNodeId = null;
+    render();
+  }
+
+  function renderPanel(){
+    const id = state.selectedNodeId;
+    if(!id || !state.nodes.has(id)){
+      noSel.style.display = 'block';
+      editor.style.display = 'none';
+      edgesList.innerHTML = '';
+      return;
+    }
+
+    const node = state.nodes.get(id);
+    noSel.style.display = 'none';
+    editor.style.display = 'block';
+
+    edName.value = node.name;
+    edType.value = node.type;
+    edQty.value  = node.qty;
+    edItem.value = node.item;
+
+    // edges related
+    const edges = [...state.edges.values()].filter(e => e.from===id || e.to===id);
+    edgesList.innerHTML = '';
+    if(edges.length === 0){
+      edgesList.innerHTML = `<div class="mini">Nenhuma linha ligada a este bloco ainda.</div>`;
+      return;
+    }
+
+    for(const e of edges){
+      const from = state.nodes.get(e.from);
+      const to = state.nodes.get(e.to);
+      const item = document.createElement('div');
+      item.className = 'edgeItem';
+      item.innerHTML = `
+        <div>
+          <div style="font-weight:800;font-size:12px">${escapeHtml(from?.name||'?')} → ${escapeHtml(to?.name||'?')}</div>
+          <div class="mini"><code>${e.id.slice(0,6)}</code> • quantidade: <b>${e.qty}</b></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button data-act="edit" data-id="${e.id}">Editar</button>
+          <button class="danger" data-act="del" data-id="${e.id}">X</button>
+        </div>
+      `;
+      edgesList.appendChild(item);
+    }
+
+    edgesList.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const act = btn.dataset.act;
+        const eid = btn.dataset.id;
+        if(act==='del'){
+          state.edges.delete(eid);
+          render();
+          return;
+        }
+        if(act==='edit'){
+          const edge = state.edges.get(eid);
+          const v = prompt('Quantidade da linha:', String(edge.qty));
+          if(v===null) return;
+          const n = Number(v);
+          if(Number.isFinite(n) && n>=0){
+            edge.qty = n;
+            render();
+          } else {
+            alert('Digite um número >= 0');
+          }
+        }
+      });
+    });
+  }
+
+  // Drag move
+  window.addEventListener('pointermove', (e) => {
+    if(!state.dragging) return;
+    const id = state.dragging;
+    const node = state.nodes.get(id);
+    if(!node) return;
+
+    const wrap = document.getElementById('canvasWrap').getBoundingClientRect();
+    node.x = Math.max(10, Math.min(e.clientX - wrap.left - state.offset.x, wrap.width - 240));
+    node.y = Math.max(10, Math.min(e.clientY - wrap.top  - state.offset.y, wrap.height - 140));
+    render();
+  });
+  window.addEventListener('pointerup', () => { state.dragging = null; });
+
+  // Buttons
+  btnAdd.addEventListener('click', () => {
+    addNode({
+      name: 'Novo bloco',
+      type: 'client',
+      qty: 0,
+      item: 'Andaime 1,5m',
+      x: 120 + Math.random()*220,
+      y: 120 + Math.random()*220
+    });
+  });
+
+  btnConnect.addEventListener('click', () => {
+    state.connectMode = !state.connectMode;
+    state.connectFrom = null;
+    btnConnect.classList.toggle('active', state.connectMode);
+  });
+
+  btnReset.addEventListener('click', () => {
+    state.nodes.clear();
+    state.edges.clear();
+    state.selectedNodeId = null;
+    state.connectFrom = null;
+    render();
+  });
+
+  btnDemo.addEventListener('click', () => {
+    state.nodes.clear();
+    state.edges.clear();
+
+    const p = { name:'Parceiro A', type:'partner', qty:10, item:'Andaime 1,5m', x:80, y:90 };
+    const c1 = { name:'Cliente João', type:'client', qty:5, item:'Andaime 1,5m', x:420, y:60 };
+    const c2 = { name:'Cliente Maria', type:'client', qty:5, item:'Andaime 1,5m', x:420, y:180 };
+    const pool = { name:'Pool (Devolução)', type:'pool', qty:0, item:'Andaime 1,5m', x:760, y:120 };
+
+    const ids = [];
+    [p,c1,c2,pool].forEach(n => { ids.push(uid()); });
+    const [idP,idC1,idC2,idPool] = ids;
+
+    state.nodes.set(idP,   {id:idP, ...p});
+    state.nodes.set(idC1,  {id:idC1, ...c1});
+    state.nodes.set(idC2,  {id:idC2, ...c2});
+    state.nodes.set(idPool,{id:idPool, ...pool});
+
+    state.edges.set(uid(), {id:uid(), from:idP, to:idC1, qty:5});
+    state.edges.set(uid(), {id:uid(), from:idP, to:idC2, qty:5});
+    // Exemplo de devolução parcial
+    state.edges.set(uid(), {id:uid(), from:idC1, to:idPool, qty:2});
+    state.edges.set(uid(), {id:uid(), from:idC2, to:idPool, qty:1});
+
+    selectNode(idP);
+    render();
+  });
+
+  // Editor actions
+  btnUpdate.addEventListener('click', () => {
+    const id = state.selectedNodeId;
+    if(!id) return;
+    const node = state.nodes.get(id);
+    node.name = edName.value.trim() || 'Sem nome';
+    node.type = edType.value;
+    node.qty  = Math.max(0, Number(edQty.value||0));
+    node.item = edItem.value.trim();
+    render();
+  });
+
+  btnDelete.addEventListener('click', () => {
+    const id = state.selectedNodeId;
+    if(!id) return;
+    if(confirm('Excluir este bloco e suas linhas?')) deleteNode(id);
+  });
+
+  // Click empty space to unselect
+  document.getElementById('canvasWrap').addEventListener('pointerdown', (e) => {
+    if(e.target === nodesLayer || e.target === svg || e.target.id === 'canvasWrap'){
+      state.selectedNodeId = null;
+      render();
+    }
+  });
+
+  // Initial
+  btnDemo.click();
+})();
+</script>
+</body>
+</html>
